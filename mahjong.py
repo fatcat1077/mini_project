@@ -59,8 +59,8 @@ def can_win_16_hand(tiles):
     """
 
     # 先過濾掉花牌 (花牌理論上不會放在最終判斷的 16 張中，但這裡保險處理)
-    tiles_no_flower = [t for t in tiles if not is_flower(t)]
-    if len(tiles_no_flower) != 16:
+    tiles_no_flower = tile
+    if len(tiles_no_flower) != 17:
         return False
 
     # 先嘗試找「將」(pair)；抓到 pair 後，其餘 14 張要能分成 4 組刻/順。
