@@ -16,7 +16,8 @@ def create_tile_set():
     - 三種花色(筒/條/萬)各 1~9，四張各 = 108 張
     - 風牌(東南西北)各4張 = 16 張
     - 三元牌(中發白)各4張 = 12 張
-    - 花牌 8 張
+    - 花牌 8 張 = 8 張
+    總計 144 張
     """
     tiles = []
 
@@ -43,28 +44,25 @@ def create_tile_set():
     return tiles
 
 def is_flower(tile):
-    """
-    判斷是否為花牌 (此處以簡單字串判斷)
-    """
+    """判斷是否為花牌"""
     return tile.startswith('F')
 
-# --------------------------------
-# 2. 定義判斷胡牌的示範函式 (16 張)
-# --------------------------------
-def can_win_16_hand(tiles):
-    """
-    判斷手牌（16 張）是否符合「5 組(刻/順) + 1 對將」。
-    這是非常簡化的示例，沒有完整考慮花牌在手的情況，也沒考慮各種特殊番型。
-    實際可再做更多嚴謹的檢查與演算法優化。
-    """
 
-    # 先過濾掉花牌 (花牌理論上不會放在最終判斷的 16 張中，但這裡保險處理)
-    tiles_no_flower = tile
+# --------------------------------
+# 2. 定義判斷胡牌 (17 張) 的函式
+# --------------------------------
+
+def can_win_17_hand(tiles):
+    """
+    判斷手牌（17 張）是否符合「5 組(刻/順) + 1 對將」的基本結構。
+    - 先過濾花牌（理論上花應該即時補掉，不會留在手上）
+    - 若過濾後實際牌張數 != 17，就直接 False
+    - 拆法：先找一對將，剩 15 張檢查能否拆成 5 組刻/順
+    """
+    # 過濾花牌
+    tiles_no_flower = [t for t in tiles if not is_flower(t)]
     if len(tiles_no_flower) != 17:
         return False
-
-    # 先嘗試找「將」(pair)；抓到 pair 後，其餘 14 張要能分成 4 組刻/順。
-    # 這裡提供一個簡單的「DFS 拆牌」邏輯示範。
 
     tile_count = defaultdict(int)
     for t in tiles_no_flower:
@@ -72,24 +70,26 @@ def can_win_16_hand(tiles):
 
     unique_tiles = list(set(tiles_no_flower))
 
-    # 檢查所有可能將牌
+    # 嘗試所有可能的將
     for tile in unique_tiles:
         if tile_count[tile] >= 2:
             # 先取出一對當將
             tile_count[tile] -= 2
-            if check_melds_14(tile_count):
+            if check_melds_15(tile_count):
                 return True
             # 還原
             tile_count[tile] += 2
 
     return False
 
-def check_melds_14(tile_count):
+def check_melds_15(tile_count):
     """
-    檢查在 tile_count 下的所有牌（14 張）能否拆成 4 組刻/順。
-    只示範「筒/條/萬」順子判斷，以及刻子(3 張相同)，風牌/字牌無法組順子，僅能刻子。
+    檢查在 tile_count 下的所有牌（15 張）能否拆成 5 組刻/順 (每組 3 張)。
+    邏輯：遞迴 / DFS
+     - 若全部用完 => True
+     - 嘗試刻子或順子 => 成功即 True，失敗回溯繼續
     """
-    # 若全部排都用完，即代表可以組成 4 組
+    # 若所有牌都已用完，表示成功拆出所有組合
     if all(c == 0 for c in tile_count.values()):
         return True
 
@@ -99,7 +99,7 @@ def check_melds_14(tile_count):
             # 1) 嘗試刻子
             if cnt >= 3:
                 tile_count[tile] -= 3
-                if check_melds_14(tile_count):
+                if check_melds_15(tile_count):
                     tile_count[tile] += 3
                     return True
                 tile_count[tile] += 3
@@ -112,13 +112,12 @@ def check_melds_14(tile_count):
                 except:
                     continue
 
-                # 檢查 rank, rank+1, rank+2
                 needed_tiles = [f"{suit}{rank+i}" for i in range(3)]
                 # 是否都存在
                 if all(tile_count[t] >= 1 for t in needed_tiles):
                     for t in needed_tiles:
                         tile_count[t] -= 1
-                    if check_melds_14(tile_count):
+                    if check_melds_15(tile_count):
                         for t in needed_tiles:
                             tile_count[t] += 1
                         return True
@@ -129,6 +128,7 @@ def check_melds_14(tile_count):
 
     return False
 
+
 # -------------------------
 # 3. 建立玩家、遊戲流程類別
 # -------------------------
@@ -136,8 +136,8 @@ class Player:
     def __init__(self, player_id):
         self.id = player_id
         self.hand = []      # 手牌 (list)
-        self.flowers = []   # 補出的花牌紀錄
-        self.melds = []     # 副露 (吃/碰/槓) 的列表
+        self.flowers = []   # 花牌區 (補出的花)
+        self.melds = []     # 副露 (吃/碰/槓)
 
     def __str__(self):
         return f"Player {self.id} | Hand: {self.hand} | Flowers: {self.flowers} | Melds: {self.melds}"
@@ -150,11 +150,11 @@ class MahjongGame:
         self.players = [Player(i) for i in range(4)]
         self.current_player_idx = 0
 
-        # 依規則：若要「莊家多一張」可在此加，但範例先不做莊家17張
+        # 發牌：每人 16 張
         self.deal_initial_hands()
 
-        # 用兩個指標：前端摸牌 / 後端補牌
-        self.front_idx = 0
+        # 前端摸牌 / 後端補牌 指標
+        self.front_idx = 16 * 4  # 發完 16*4=64 張後，接下來摸牌的位置
         self.back_idx = len(self.tiles) - 1
 
         self.discard_pile = []  # 棄牌區 (簡化)
@@ -163,22 +163,19 @@ class MahjongGame:
         self.game_over = False
 
     def deal_initial_hands(self):
-        """
-        每人先抓 16 張 (若要莊家 17 張，可在此調整)
-        """
+        """每位玩家先抓 16 張，並進行起手補花"""
         for _ in range(16):
             for p in self.players:
-                tile = self.tiles[self.front_idx]
+                p.hand.append(self.tiles[self.front_idx])
                 self.front_idx += 1
-                p.hand.append(tile)
 
-        # 發完起手牌後，先執行所有玩家起手花牌補花
+        # 檢查起手花牌並即時補花
         for p in self.players:
             self.check_and_replace_flowers(p)
 
     def check_and_replace_flowers(self, player):
         """
-        檢查玩家手上的花牌，若有則從牌尾補牌 (直到沒有花牌)
+        檢查玩家手上的花牌，若有則從牌尾補牌 (直到沒有花牌為止)。
         """
         i = 0
         while i < len(player.hand):
@@ -192,21 +189,20 @@ class MahjongGame:
                     self.back_idx -= 1
                     player.hand.append(replacement)
                 else:
-                    # 理論上不會發生：牌不夠了
                     print("Error: Not enough tiles to replace flower!")
                     self.game_over = True
                     return
             else:
                 i += 1
-
-        # 若補出的牌又是花，需繼續檢查，所以用 while 而不是 for
+        # 若新補的牌又是花牌 => 繼續檢查，因此使用 while 而不是 for
 
     def draw_tile(self, player):
         """
-        玩家從牌山前端摸牌，若摸到花牌也執行補花
+        玩家從牌山前端摸牌，若摸到花牌則從後端補。
+        此時玩家會有 17 張牌 (若原本手牌 16)。
         """
         if self.front_idx > self.back_idx:
-            # 無牌可摸 => 流局
+            # 牌已摸完 => 流局
             print("[No Tiles] 流局！")
             self.game_over = True
             return
@@ -214,13 +210,14 @@ class MahjongGame:
         tile = self.tiles[self.front_idx]
         self.front_idx += 1
         player.hand.append(tile)
-        # 檢查是否為花，若是就要補花
+
+        # 檢查補花
         self.check_and_replace_flowers(player)
 
     def discard_tile(self, player):
         """
-        這裡用非常簡化的「隨機打牌」示例，真實的策略可自行設計。
-        打出一張牌後，放入 discard_pile。
+        這裡用非常簡化的隨機打牌示例，
+        實際可改為 AI 或規則式打牌。
         """
         if not player.hand:
             return
@@ -228,24 +225,29 @@ class MahjongGame:
         discard_index = random.randrange(len(player.hand))
         discard = player.hand.pop(discard_index)
         self.discard_pile.append((player.id, discard))
-        # 這裡沒有立即觸發吃/碰/槓判斷，只做示例
         print(f"[Discard] Player {player.id} 打出: {discard}")
 
     def check_for_win(self, player):
         """
-        簡單檢查玩家是否胡牌
+        簡單檢查玩家是否胡牌 (17 張)，
+        不含特殊牌型。
         """
-        if can_win_16_hand(player.hand):
+        if can_win_17_hand(player.hand):
             self.winner = player
             self.game_over = True
-            print(f"玩家 {player.id} 胡了！ 手牌: {player.hand}")
+            print(f"玩家 {player.id} 胡牌！ 手牌: {player.hand}")
         else:
             pass  # 未胡
 
     def step(self):
         """
-        執行一個玩家的「摸牌 -> (可槓?) -> 打牌 -> (其他家可吃碰胡?)」的流程示例
-        這裡先省略吃/碰/槓的多家判斷，示意用。
+        執行單位回合流程：
+          1) 摸牌 (16->17)
+          2) 自摸判斷
+          3) (可擴充槓牌判斷)
+          4) 打牌 (17->16)
+          5) 他家可吃碰槓胡 => 範例略 (僅預留結構)
+          6) 剩餘牌 <= 16 => 流局
         """
         current_player = self.players[self.current_player_idx]
 
@@ -254,37 +256,37 @@ class MahjongGame:
         if self.game_over:
             return
 
-        # 2) 檢查胡牌 (自摸)
+        # 2) 自摸判斷
         self.check_for_win(current_player)
         if self.game_over:
             return
 
-        # 3) 範例中省略「是否槓牌」的判斷，可在這邊實作暗槓、加槓等
-        #    若有槓，再進行補牌 (後端)
+        # 3) 暗槓 / 加槓 等 => 可在此實作
+        #    若有槓 => 需要從牌尾補 => 再次檢查胡牌
+        #    這裡暫時省略
 
-        # 4) 打牌 (目前隨機打一張)
+        # 4) 打牌 (回到 16 張)
         self.discard_tile(current_player)
         if self.game_over:
             return
 
-        # 5) 假設其他家可以搶胡、碰、吃等，這裡先省略，只展示結構
-        #    若要實作，則需要在此依序檢查「誰可以胡？誰可以槓？誰可以碰？誰可以吃？」
-        #    並根據優先順序執行。
+        # 5) 其他玩家是否能吃碰槓胡 => 這裡省略示例
+        #    若有人搶胡 => 中斷
 
-        # 最後，檢查剩餘牌數是否 <= 16 => 流局
+        # 6) 流局判斷：牌山剩餘 <= 16 張
         if (self.back_idx - self.front_idx + 1) <= 16:
             print("[流局] 牌山剩餘 16 張，結束本局。")
             self.game_over = True
             return
 
-        # 下一位
+        # 下一位玩家
         self.current_player_idx = (self.current_player_idx + 1) % 4
 
     def play(self):
         """
-        不斷循環 step()，直到有人胡牌或流局。
+        不斷輪流 step()，直到有人胡牌或流局。
         """
-        print("---- 開始單一局模擬 (台灣16張) ----")
+        print("---- 開始單局模擬 (台灣 16 張) ----")
         round_count = 0
 
         while not self.game_over:
@@ -296,9 +298,7 @@ class MahjongGame:
             print(f"得勝者: Player {self.winner.id}")
         else:
             print("沒有玩家胡牌，或因流局結束。")
-
-        # TODO: 這裡可接續做台數計算的模組 (暫不實作)
-        # e.g. self.calculate_score(...)
+        # TODO: 台數計算部分可在這裡擴充
 
 # -------------------------
 # 4. 進行單局模擬
