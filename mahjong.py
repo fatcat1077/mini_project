@@ -150,12 +150,12 @@ class MahjongGame:
         self.players = [Player(i) for i in range(4)]
         self.current_player_idx = 0
 
-        # 發牌：每人 16 張
-        self.deal_initial_hands()
-
         # 前端摸牌 / 後端補牌 指標
         self.front_idx = 16 * 4  # 發完 16*4=64 張後，接下來摸牌的位置
         self.back_idx = len(self.tiles) - 1
+        # 發牌：每人 16 張
+        self.deal_initial_hands()
+        
 
         self.discard_pile = []  # 棄牌區 (簡化)
 
