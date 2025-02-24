@@ -3,12 +3,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 
 import gc
 
 print('Loading data ...')
 
-data_root='./timit_11/'
+data_root='C:/Users/marti/Downloads/data/timit_11/'
 train = np.load(data_root + 'train_11.npy')
 train_label = np.load(data_root + 'train_label_11.npy')
 test = np.load(data_root + 'test_11.npy')
@@ -20,7 +21,7 @@ class TIMITDataset(Dataset):
     def __init__(self, X, y=None):
         self.data = torch.from_numpy(X).float()
         if y is not None:
-            y = y.astype(np.int)
+            y = y.astype(int)
             self.label = torch.LongTensor(y)
         else:
             self.label = None
@@ -41,9 +42,8 @@ train_x, train_y, val_x, val_y = train[:percent], train_label[:percent], train[p
 print('Size of training set: {}'.format(train_x.shape))
 print('Size of validation set: {}'.format(val_x.shape))
 
-BATCH_SIZE = 64
+BATCH_SIZE = 256
 
-from torch.utils.data import DataLoader
 
 train_set = TIMITDataset(train_x, train_y)
 val_set = TIMITDataset(val_x, val_y)
@@ -61,7 +61,7 @@ class Classifier(nn.Module):
         self.layer3 = nn.Linear(512, 128)
         self.out = nn.Linear(128, 39) 
 
-        self.act_fn = nn.Sigmoid()
+        self.act_fn = nn.LeakyReLU()
 
     def forward(self, x):
         x = self.layer1(x)
@@ -74,7 +74,7 @@ class Classifier(nn.Module):
         x = self.act_fn(x)
 
         x = self.out(x)
-        
+        self.dropout = nn.Dropout(p=0.5)
         return x
     
 #check device
@@ -99,7 +99,7 @@ device = get_device()
 print(f'DEVICE: {device}')
 
 # training parameters
-num_epoch = 20               # number of training epoch
+num_epoch = 50               # number of training epoch
 learning_rate = 0.0001       # learning rate
 
 # the path where checkpoint saved
@@ -108,7 +108,11 @@ model_path = './model.ckpt'
 # create model, define a loss function, and optimizer
 model = Classifier().to(device)
 criterion = nn.CrossEntropyLoss() 
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=learning_rate,
+    weight_decay=1e-5  # 小的 L2 正則項
+)
 
 best_acc = 0.0
 for epoch in range(num_epoch):
