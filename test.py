@@ -1,4 +1,5 @@
 from tensorflow.keras.models import load_model
+from pathlib import Path
 import numpy as np
 from PIL import Image
 
@@ -34,6 +35,11 @@ def predict_unknown_image(image_path):
     return predicted_class[0]
 
 # 範例：對一張未知圖片進行預測（請將 "unknown_image.png" 換成你的圖片檔案名稱）
-image_path = "test_photo2.png"
-result = predict_unknown_image(image_path)
-print("預測結果:", result)
+for i in range(10):
+    str_num = "%s" % i
+    photos_path = Path("photos")
+    image_path = photos_path / f"{i}.PNG"
+    # 如果 predict_unknown_image() 函數需要字串，就轉成字串
+    result = predict_unknown_image(str(image_path))
+    print("預測結果",result)
+

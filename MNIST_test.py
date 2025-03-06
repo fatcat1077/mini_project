@@ -198,4 +198,7 @@ if __name__ == "__main__":
     #evaluate_model_on_mnist("simpnet_mnist.pth", batch_size=64, device=device)
     
     # (2) 若想測單張圖片 (路徑自行替換)
-    predict_single_image("simpnet_mnist.pth", "test_photo1.png", device=device)
+    for i in range(10):
+        str_num = "%s" % i
+        path = "photos/"+str_num+".PNG"
+        predict_single_image("simpnet_mnist.pth", path, device=device)
