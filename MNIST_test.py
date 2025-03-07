@@ -4,6 +4,10 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torchvision import datasets, transforms
+import matplotlib.pyplot as plt
+import numpy as np
+import PIL
+from PIL import Image
 
 
 #---- 模型定義(與訓練時相同) ----
@@ -159,9 +163,6 @@ def predict_single_image(model_path, image_path, device='cpu'):
     對單張圖片做預測。
     需確保圖片能被轉換成 1通道 28x28 (MNIST 格式)。
     """
-    import PIL
-    from PIL import Image
-
     # 1. 建立模型
     model = SimpNetDropoutMNIST(num_classes=10).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
@@ -176,6 +177,14 @@ def predict_single_image(model_path, image_path, device='cpu'):
     ])
     img = Image.open(image_path)
     x = transform(img).unsqueeze(0).to(device)  # shape: [1,1,28,28]
+    # 假設 x 是經過 transform 後的 normalized tensor，shape: [1,1,28,28]
+    img_normalized = x.squeeze(0).cpu().numpy()  # shape: (1, 28, 28)
+    # 將數值縮放到 [0, 1] 以便顯示
+    img_disp = (img_normalized[0] - img_normalized[0].min()) / (img_normalized[0].max() - img_normalized[0].min())
+    plt.imshow(img_disp, cmap='gray')
+    plt.title("Normalized Image")
+    plt.axis('off')
+    plt.show()
 
     # 3. 前向傳播
     with torch.no_grad():
