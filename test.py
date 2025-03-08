@@ -1,45 +1,40 @@
-from tensorflow.keras.models import load_model
-from pathlib import Path
+import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
+from torchvision import datasets, transforms
 
-# 讀取已保存的模型
-model = load_model('my_mlp_model.h5')
+# 定義轉換（包含 normalization）
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.1307,), (0.3081,))
+])
 
-def predict_unknown_image(image_path):
-    """
-    讀取圖片、預處理並進行預測，返回預測的數字類別
-    """
-    # 1. 開啟圖片並轉為灰階
-    img = Image.open(image_path).convert('L')
-    
-    # 2. 調整圖片大小為 28x28（MNIST 的尺寸）
-    img = img.resize((28, 28))
-    
-    # 3. 轉換成 numpy 陣列
-    img_array = np.array(img)
-    
-    # 如果圖片是白字黑底，而 MNIST 是黑字白底，可視情況反轉顏色：
-    # img_array = 255 - img_array
-    
-    # 4. 將像素值正規化至 [0,1]
-    img_array = img_array / 255.0
-    
-    # 5. 攤平成 1 維向量並增加 batch 維度，使其形狀符合 (1, 784)
-    img_array = img_array.reshape(1, 784)
-    
-    # 6. 使用模型進行預測
-    predictions = model.predict(img_array)
-    predicted_class = np.argmax(predictions, axis=1)
-    
-    return predicted_class[0]
+# 載入 MNIST 訓練資料
+train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 
-# 範例：對一張未知圖片進行預測（請將 "unknown_image.png" 換成你的圖片檔案名稱）
-for i in range(10):
-    str_num = "%s" % i
-    photos_path = Path("photos")
-    image_path = photos_path / f"{i}.PNG"
-    # 如果 predict_unknown_image() 函數需要字串，就轉成字串
-    result = predict_unknown_image(str(image_path))
-    print("預測結果",result)
+# 定義反向 normalization，用以將圖片轉回原始像素值（可選）
+inv_normalize = transforms.Normalize(
+    mean=[-0.1307/0.3081],
+    std=[1/0.3081]
+)
 
+# 選取要顯示的圖片數量（例如顯示 5 張）
+num_images = 5
+fig, axes = plt.subplots(1, num_images, figsize=(15, 3))
+
+for i in range(num_images):
+    # 取出圖片與標籤
+    img, label = train_dataset[i]
+    
+    # 若要顯示反向 normalization 後的圖片，則使用 inv_normalize 轉換
+    img_inv = inv_normalize(img)
+    
+    # 將 tensor 轉成 numpy 陣列，並 squeeze 掉多餘的維度（因 MNIST 是單通道）
+    img_np = img_inv.numpy().squeeze()
+    
+    # 顯示圖片，設定為灰階
+    axes[i].imshow(img_np, cmap='gray')
+    axes[i].set_title(f"Label: {label}")
+    axes[i].axis('off')
+
+plt.tight_layout()
+plt.show()
